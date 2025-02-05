@@ -3,15 +3,15 @@ use std::borrow::Cow;
 /// A kind of column.
 pub trait ColumnKind {
     /// Assess how much given header is similar to what we can expect for this kind of column.
-    fn assess_header(&self, header: &str) -> f32;
+    fn assess_header(&self, header: &str) -> f64;
 
     /// Assess how much given value is similar to what we can expect for this kind of column.
-    fn assess_value(&self, value: &str) -> f32;
+    fn assess_value(&self, value: &str) -> f64;
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Assessment {
-    pub similarity: f32,
+    pub similarity: f64,
     pub position: usize,
 }
 
@@ -102,8 +102,10 @@ impl SimpleAssessor {
     pub fn with_dict<S: AsRef<str>>(
         self,
         value: impl AsRef<str>,
-        dict: impl Iterator<Item = S>,
+        dict: impl IntoIterator<Item = S>,
     ) -> f64 {
+        let dict = dict.into_iter();
+
         let value = if self.is_alpha_reduced {
             // Replace all continuous alphabets with 'a', expecting dictionary to present alphabets as 'a's
             Cow::Owned(reduce(value.as_ref(), char::is_alphabetic, 'a'))
@@ -152,6 +154,23 @@ impl SimpleAssessor {
             }
         }
         max
+    }
+
+    pub fn with_dict_best<S1: AsRef<str>, S2: AsRef<str>>(
+        self,
+        values: impl IntoIterator<Item = S1>,
+        dict: impl IntoIterator<Item = S2> + Clone,
+    ) -> Assessment {
+        let mut max = 0.0;
+        let mut position = 0;
+        for (i, value) in values.into_iter().enumerate() {
+            let similarity = self.with_dict(value, dict.clone());
+            if max < similarity {
+                max = similarity;
+                position = i;
+            }
+        }
+        Assessment { similarity: max, position }
     }
 }
 
